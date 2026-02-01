@@ -27,26 +27,56 @@ function translate(query, completion) {
         return;
     }
 
-    // Split text by lines to preserve formatting
     var lines = text.split('\n');
 
-    // Create promises for each line
     var promises = lines.map(function (line) {
         if (!line.trim()) {
-            return Promise.resolve(line);
+            return Promise.resolve({ converted: line, words: [] });
         }
         return fetchFurigana(line, api_id);
     });
 
     Promise.all(promises)
         .then(function (results) {
-            var finalResult = results.join('\n');
-            completion({
-                result: {
-                    from: 'ja',
-                    to: 'ja',
-                    toParagraphs: results
+            var convertedParagraphs = results.map(function (r) { return r.converted; });
+
+            // Flatten all words from all lines
+            var allWords = [];
+            results.forEach(function (r) {
+                if (r.words) {
+                    allWords = allWords.concat(r.words);
                 }
+            });
+
+            // Filter for vocabulary (Kanji words)
+            // Criteria: furigana exists AND furigana != surface
+            var vocabList = allWords.filter(function (w) {
+                return w.furigana && w.surface !== w.furigana;
+            });
+
+            // Construct toDict parts
+            var parts = vocabList.map(function (w) {
+                return {
+                    part: w.surface,
+                    means: [w.furigana]
+                };
+            });
+
+            var resultObj = {
+                from: 'ja',
+                to: 'ja',
+                toParagraphs: convertedParagraphs
+            };
+
+            // Only add toDict if we found vocabulary
+            if (parts.length > 0) {
+                resultObj.toDict = {
+                    parts: parts
+                };
+            }
+
+            completion({
+                result: resultObj
             });
         })
         .catch(function (err) {
@@ -85,25 +115,22 @@ function fetchFurigana(text, api_id) {
 
         var data = resp.data;
 
-        // Handle API errors (JSON-RPC error response)
         if (data.error) {
             throw new Error('API Error: ' + data.error.message);
         }
 
         if (!data.result || !data.result.word) {
-            // Fallback if structure is unexpected but no error
-            return text;
+            return { converted: text, words: [] };
         }
 
         var words = data.result.word;
         var convertedText = words.map(function (word) {
-            var surface = word.surface;
-            var furigana = word.furigana;
-
-            // Always return kana (furigana) if available, otherwise surface
-            return furigana || surface;
+            return word.furigana || word.surface;
         }).join('');
 
-        return convertedText;
+        return {
+            converted: convertedText,
+            words: words
+        };
     });
 }
