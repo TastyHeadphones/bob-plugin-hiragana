@@ -2,6 +2,8 @@
 
 A [Bob](https://bobtranslate.com/) plugin that converts Japanese Kanji text into Furigana (Hiragana) using the [Yahoo JAPAN Furigana API](https://developer.yahoo.co.jp/webapi/jlp/furigana/v2/furigana.html).
 
+[English](README.md) | [日本語](README_ja.md) | [中文](README_zh.md)
+
 ## Features
 
 - **Convert Kanji to Hiragana**: Uses Yahoo JAPAN's accurate Furigana API.
