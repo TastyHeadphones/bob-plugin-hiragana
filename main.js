@@ -29,36 +29,81 @@ function translate(query, completion) {
 
     var lines = text.split('\n');
 
-    var promises = lines.map(function (line) {
+    // Process each line: Fetch both Translation (Furigana) and Analysis (MA)
+    var linePromises = lines.map(function (line) {
         if (!line.trim()) {
-            return Promise.resolve({ converted: line, words: [] });
+            return Promise.resolve({
+                converted: line,
+                tokens: []
+            });
         }
-        return fetchFurigana(line, api_id);
+
+        // Execute both requests in parallel for this line
+        return Promise.all([
+            fetchFurigana(line, api_id),
+            fetchMAService(line, api_id)
+        ]).then(function (results) {
+            return {
+                converted: results[0], // Full Hiragana string
+                tokens: results[1]     // MA Tokens array
+            };
+        });
     });
 
-    Promise.all(promises)
-        .then(function (results) {
-            var convertedParagraphs = results.map(function (r) { return r.converted; });
+    Promise.all(linePromises)
+        .then(function (lineResults) {
+            var convertedParagraphs = lineResults.map(function (r) { return r.converted; });
 
-            // Flatten all words from all lines
-            var allWords = [];
-            results.forEach(function (r) {
-                if (r.words) {
-                    allWords = allWords.concat(r.words);
+            // Flatten all tokens from all lines
+            var allTokens = [];
+            lineResults.forEach(function (r) {
+                if (r.tokens) {
+                    allTokens = allTokens.concat(r.tokens);
                 }
             });
 
-            // Filter for vocabulary (Kanji words)
-            // Criteria: furigana exists AND furigana != surface
-            var vocabList = allWords.filter(function (w) {
-                return w.furigana && w.surface !== w.furigana;
+            // Filter for Vocabulary (Nouns/Verbs/Adjectives that contain Kanji)
+            var targetPOS = ['名詞', '動詞', '形容詞'];
+            // Kanji Regex: [\u4e00-\u9faf]
+            var kanjiRegex = /[\u4e00-\u9faf]/;
+
+            var vocabList = allTokens.filter(function (t) {
+                var surface = t[0];
+                var reading = t[1];
+                var pos = t[3];
+
+                // 1. Must be target POS
+                if (targetPOS.indexOf(pos) === -1) return false;
+                // 2. Must contain Kanji (to filter out pure kana words like "する", "いる")
+                if (!kanjiRegex.test(surface)) return false;
+                // 3. Surface must not equal Reading
+                if (surface === reading) return false;
+
+                return true;
             });
 
-            // Construct toDict parts
-            var parts = vocabList.map(function (w) {
+            // Use an object to deduplicate by word surface
+            var uniqueVocab = {};
+            vocabList.forEach(function (t) {
+                var surface = t[0];
+                var reading = t[1];
+                var pos = t[3];
+
+                if (!uniqueVocab[surface]) {
+                    uniqueVocab[surface] = {
+                        part: surface, // Use the Kanji word as the "Part of Speech" label for visibility
+                        means: [reading] // The reading becomes the definition
+                    };
+                }
+            });
+
+            // Convert to Bob parts array
+            var parts = Object.keys(uniqueVocab).map(function (key) {
+                var item = uniqueVocab[key];
                 return {
-                    part: w.surface,
-                    means: [w.furigana]
+                    part: item.part,
+                    part_name: item.part, // Helper for display
+                    means: item.means
                 };
             });
 
@@ -68,12 +113,11 @@ function translate(query, completion) {
                 toParagraphs: convertedParagraphs
             };
 
-            // Only add toDict if we found vocabulary
-            if (parts.length > 0) {
-                resultObj.toDict = {
-                    parts: parts
-                };
-            }
+            // Construct toDict
+            resultObj.toDict = {
+                word: text,
+                parts: parts.length > 0 ? parts : []
+            };
 
             completion({
                 result: resultObj
@@ -109,28 +153,38 @@ function fetchFurigana(text, api_id) {
             }
         }
     }).then(function (resp) {
-        if (resp.error) {
-            throw new Error(resp.error.localizedDescription || 'Network error');
-        }
-
         var data = resp.data;
+        if (data.error) throw new Error('Furigana API Error: ' + data.error.message);
+        if (!data.result || !data.result.word) return text;
 
-        if (data.error) {
-            throw new Error('API Error: ' + data.error.message);
-        }
-
-        if (!data.result || !data.result.word) {
-            return { converted: text, words: [] };
-        }
-
-        var words = data.result.word;
-        var convertedText = words.map(function (word) {
+        return data.result.word.map(function (word) {
             return word.furigana || word.surface;
         }).join('');
+    });
+}
 
-        return {
-            converted: convertedText,
-            words: words
-        };
+function fetchMAService(text, api_id) {
+    return $http.request({
+        method: 'POST',
+        url: 'https://jlp.yahooapis.jp/MAService/V2/parse',
+        header: {
+            'Content-Type': 'application/json',
+            'User-Agent': 'Yahoo AppID: ' + api_id
+        },
+        body: {
+            "id": "12345",
+            "jsonrpc": "2.0",
+            "method": "jlp.maservice.parse",
+            "params": {
+                "q": text
+            }
+        }
+    }).then(function (resp) {
+        var data = resp.data;
+        if (data.error) throw new Error('MA API Error: ' + data.error.message);
+        // MA V2 returns result.tokens
+        if (!data.result || !data.result.tokens) return [];
+
+        return data.result.tokens;
     });
 }

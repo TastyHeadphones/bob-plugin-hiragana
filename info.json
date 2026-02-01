@@ -1,5 +1,5 @@
 {
-    "identifier": "com.bob-plugin-hiragana.TastyHeadphones",
+    "identifier": "com.tastyheadphones.bob.plugin.hiragana",
     "version": "1.0.0",
     "category": "translate",
     "name": "Japanese Furigana",
