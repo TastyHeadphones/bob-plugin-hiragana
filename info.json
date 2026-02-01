@@ -1,37 +1,20 @@
 {
-  "identifier": "com.bob-plugin-hiragana.young",
-  "version": "1.0.0",
-  "category": "translate",
-  "name": "Japanese Furigana",
-  "summary": "Convert Kanji to Furigana (Kana) using Yahoo JAPAN API",
-  "icon": "icon.png",
-  "author": "Young",
-  "homepage": "https://github.com/TastyHeadphones/bob-plugin-hiragana",
-  "minBobVersion": "1.8.0",
-  "options": [
-    {
-      "identifier": "api_id",
-      "type": "text",
-      "title": "Yahoo Client ID",
-      "desc": "Your Yahoo JAPAN App ID (Client ID)",
-      "defaultValue": ""
-    },
-    {
-      "identifier": "mode",
-      "type": "menu",
-      "title": "Output Mode",
-      "desc": "Select the format of the output",
-      "defaultValue": "annotated",
-      "items": [
+    "identifier": "com.bob-plugin-hiragana.TastyHeadphones",
+    "version": "1.0.0",
+    "category": "translate",
+    "name": "Japanese Furigana",
+    "summary": "Convert Kanji to Furigana (Kana) using Yahoo JAPAN API",
+    "icon": "icon.png",
+    "author": "TastyHeadphones",
+    "homepage": "https://github.com/TastyHeadphones/bob-plugin-hiragana",
+    "minBobVersion": "1.8.0",
+    "options": [
         {
-          "title": "Annotated: 漢字(かんじ)",
-          "value": "annotated"
-        },
-        {
-          "title": "Kana Only: かんじ",
-          "value": "kana"
+            "identifier": "api_id",
+            "type": "text",
+            "title": "Yahoo Client ID",
+            "desc": "Your Yahoo JAPAN App ID (Client ID)",
+            "defaultValue": ""
         }
-      ]
-    }
-  ]
+    ]
 }

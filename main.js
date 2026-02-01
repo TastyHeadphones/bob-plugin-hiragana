@@ -7,7 +7,7 @@ var items = [
 ];
 
 function supportLanguages() {
-    return items.map(function(item) {
+    return items.map(function (item) {
         return item[0];
     });
 }
@@ -15,7 +15,6 @@ function supportLanguages() {
 function translate(query, completion) {
     var text = query.text;
     var api_id = $option.api_id;
-    var mode = $option.mode;
 
     if (!api_id) {
         completion({
@@ -30,17 +29,17 @@ function translate(query, completion) {
 
     // Split text by lines to preserve formatting
     var lines = text.split('\n');
-    
+
     // Create promises for each line
-    var promises = lines.map(function(line) {
+    var promises = lines.map(function (line) {
         if (!line.trim()) {
             return Promise.resolve(line);
         }
-        return fetchFurigana(line, api_id, mode);
+        return fetchFurigana(line, api_id);
     });
 
     Promise.all(promises)
-        .then(function(results) {
+        .then(function (results) {
             var finalResult = results.join('\n');
             completion({
                 result: {
@@ -50,7 +49,7 @@ function translate(query, completion) {
                 }
             });
         })
-        .catch(function(err) {
+        .catch(function (err) {
             $log.error('Translation failed: ' + JSON.stringify(err));
             completion({
                 error: {
@@ -62,7 +61,7 @@ function translate(query, completion) {
         });
 }
 
-function fetchFurigana(text, api_id, mode) {
+function fetchFurigana(text, api_id) {
     return $http.request({
         method: 'POST',
         url: 'https://jlp.yahooapis.jp/FuriganaService/V2/furigana',
@@ -79,37 +78,30 @@ function fetchFurigana(text, api_id, mode) {
                 "grade": 1
             }
         }
-    }).then(function(resp) {
+    }).then(function (resp) {
         if (resp.error) {
             throw new Error(resp.error.localizedDescription || 'Network error');
         }
-        
+
         var data = resp.data;
-        
+
         // Handle API errors (JSON-RPC error response)
         if (data.error) {
             throw new Error('API Error: ' + data.error.message);
         }
-        
+
         if (!data.result || !data.result.word) {
             // Fallback if structure is unexpected but no error
             return text;
         }
 
         var words = data.result.word;
-        var convertedText = words.map(function(word) {
+        var convertedText = words.map(function (word) {
             var surface = word.surface;
             var furigana = word.furigana;
 
-            if (mode === 'kana') {
-                return furigana || surface;
-            } else { // annotated
-                if (furigana && furigana !== surface) {
-                    return surface + '(' + furigana + ')';
-                } else {
-                    return surface;
-                }
-            }
+            // Always return kana (furigana) if available, otherwise surface
+            return furigana || surface;
         }).join('');
 
         return convertedText;
